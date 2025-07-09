@@ -259,7 +259,7 @@ traci.close()
 print("Simulation completed.")
 
 print("\n========== Simulation Summary ==========")
-print(f"Cumulative Reward: {sum(reward_history):.2f}")
+print(f"Cumulative Reward: {reward_history[-1]:.2f}")
 
 print(f"Average Queue Length (Kodrigktonos): {sum(queue_history_kodrigktonos) / len(queue_history_kodrigktonos):.2f}")
 print(f"Average Queue Length (Derigni): {sum(queue_history_derigni) / len(queue_history_derigni):.2f}")

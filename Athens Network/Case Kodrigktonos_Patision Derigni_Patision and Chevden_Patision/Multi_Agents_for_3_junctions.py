@@ -61,7 +61,7 @@ detectors = {
     ]
 }
 
-# FUNCTIONS 
+# RL-related functions 
 def get_queue_length(detector_id):
     return traci.lanearea.getLastStepVehicleNumber(detector_id)
 
@@ -74,30 +74,8 @@ def get_state(tls_id):
     current_phase = get_current_phase(tls_id)
     return tuple(queue_lengths + [current_phase])
 
-# New function to get joint state for communication
-def get_joint_state():
-    state_kp = get_state("Kodrigktonos_Patision")
-    state_dp = get_state("Derigni_Patision")
-    state_cp = get_state("Cheven_Patision")
-    # Combine queue lengths and phases from all junctions
-    joint_state = state_kp[:-1] + (state_kp[-1],) + \
-                  state_dp[:-1] + (state_dp[-1],) + \
-                  state_cp[:-1] + (state_cp[-1],)
-    return joint_state
-
-def get_reward(state, junction_prefix):
-    # Extract the queue lengths relevant for the junction from the joint state
-    if junction_prefix == "KP":
-        queues = state[:len(detectors["Kodrigktonos_Patision"])]
-    elif junction_prefix == "DP":
-        start = len(detectors["Kodrigktonos_Patision"]) + 1
-        end = start + len(detectors["Derigni_Patision"])
-        queues = state[start:end]
-    else:  # CP
-        start = len(detectors["Kodrigktonos_Patision"]) + 1 + len(detectors["Derigni_Patision"]) + 1
-        end = start + len(detectors["Cheven_Patision"])
-        queues = state[start:end]
-    return -float(sum(queues))
+def get_reward(state):
+    return -float(sum(state[:-1]))
 
 def get_action(state, q_table):
     if state not in q_table:
@@ -180,55 +158,52 @@ cumulative_reward_kp = 0
 cumulative_reward_dp = 0
 cumulative_reward_cp = 0
 
-print("=== Starting Tri-Agent RL Training with Communication ===")
+print("=== Starting Tri-Agent RL Training ===")
 for step in range(TOTAL_STEPS):
     current_step = step
 
-    joint_state = get_joint_state()
-
-    # Agent KP
-    action_kp = get_action(joint_state, Q_table_KP)
+    # Agent for Kodrigktonos_Patision
+    state_kp = get_state("Kodrigktonos_Patision")
+    action_kp = get_action(state_kp, Q_table_KP)
     apply_action("Kodrigktonos_Patision", action_kp, current_step)
 
-    # Agent DP
-    action_dp = get_action(joint_state, Q_table_DP)
+    # Agent for Derigni_Patision
+    state_dp = get_state("Derigni_Patision")
+    action_dp = get_action(state_dp, Q_table_DP)
     apply_action("Derigni_Patision", action_dp, current_step)
 
-    # Agent CP
-    action_cp = get_action(joint_state, Q_table_CP)
+    # Agent for Cheven_Patision
+    state_cp = get_state("Cheven_Patision")
+    action_cp = get_action(state_cp, Q_table_CP)
     apply_action("Cheven_Patision", action_cp, current_step)
 
     traci.simulationStep()
 
-    new_joint_state = get_joint_state()
-
-    reward_kp = get_reward(new_joint_state, "KP")
-    reward_dp = get_reward(new_joint_state, "DP")
-    reward_cp = get_reward(new_joint_state, "CP")
-
+    new_state_kp = get_state("Kodrigktonos_Patision")
+    reward_kp = get_reward(new_state_kp)
+    update_q_table(state_kp, action_kp, reward_kp, new_state_kp, Q_table_KP)
     cumulative_reward_kp += reward_kp
+
+    new_state_dp = get_state("Derigni_Patision")
+    reward_dp = get_reward(new_state_dp)
+    update_q_table(state_dp, action_dp, reward_dp, new_state_dp, Q_table_DP)
     cumulative_reward_dp += reward_dp
+
+    new_state_cp = get_state("Cheven_Patision")
+    reward_cp = get_reward(new_state_cp)
+    update_q_table(state_cp, action_cp, reward_cp, new_state_cp, Q_table_CP)
     cumulative_reward_cp += reward_cp
 
-    update_q_table(joint_state, action_kp, reward_kp, new_joint_state, Q_table_KP)
-    update_q_table(joint_state, action_dp, reward_dp, new_joint_state, Q_table_DP)
-    update_q_table(joint_state, action_cp, reward_cp, new_joint_state, Q_table_CP)
-
     if step % 100 == 0:
-
         step_history.append(step)
 
         reward_kp_history.append(cumulative_reward_kp)
         reward_dp_history.append(cumulative_reward_dp)
         reward_cp_history.append(cumulative_reward_cp)
 
-        queue_kp_history.append(sum(new_joint_state[:len(detectors["Kodrigktonos_Patision"])]))
-        start_dp = len(detectors["Kodrigktonos_Patision"]) + 1
-        end_dp = start_dp + len(detectors["Derigni_Patision"])
-        queue_dp_history.append(sum(new_joint_state[start_dp:end_dp]))
-        start_cp = end_dp + 1
-        end_cp = start_cp + len(detectors["Cheven_Patision"])
-        queue_cp_history.append(sum(new_joint_state[start_cp:end_cp]))
+        queue_kp_history.append(sum(new_state_kp[:-1]))
+        queue_dp_history.append(sum(new_state_dp[:-1]))
+        queue_cp_history.append(sum(new_state_cp[:-1]))
 
         wait_kp, stops_kp, co2_kp, fuel_kp = get_vehicle_metrics(detectors["Kodrigktonos_Patision"])
         wait_dp, stops_dp, co2_dp, fuel_dp = get_vehicle_metrics(detectors["Derigni_Patision"])
@@ -250,15 +225,16 @@ for step in range(TOTAL_STEPS):
         fuel_dp_history.append(fuel_dp)
         fuel_cp_history.append(fuel_cp)
 
+
         print(
             f"\nStep {step} Metrics:"
-            f"\n  [Kodrigktonos_Patision]  Reward: {reward_kp:.2f}  |  Queue: {sum(new_joint_state[:len(detectors['Kodrigktonos_Patision'])])}  |  Waiting: {wait_kp:.2f}s"
+            f"\n  [Kodrigktonos_Patision]  Reward: {reward_kp:.2f}  |  Queue: {sum(new_state_kp[:-1])}  |  Waiting: {wait_kp:.2f}s"
             f"  |  Stops: {stops_kp}  |  CO₂: {co2_kp:.2f}g  |  Fuel: {fuel_kp:.2f}L"
-            f"\n  [Derigni_Patision]       Reward: {reward_dp:.2f}  |  Queue: {sum(new_joint_state[start_dp:end_dp])}  |  Waiting: {wait_dp:.2f}s"
+            f"\n  [Derigni_Patision]       Reward: {reward_dp:.2f}  |  Queue: {sum(new_state_dp[:-1])}  |  Waiting: {wait_dp:.2f}s"
             f"  |  Stops: {stops_dp}  |  CO₂: {co2_dp:.2f}g  |  Fuel: {fuel_dp:.2f}L"
-            f"\n  [Cheven_Patision]        Reward: {reward_cp:.2f}  |  Queue: {sum(new_joint_state[start_cp:end_cp])}  |  Waiting: {wait_cp:.2f}s"
+            f"\n  [Cheven_Patision]        Reward: {reward_cp:.2f}  |  Queue: {sum(new_state_cp[:-1])}  |  Waiting: {wait_cp:.2f}s"
             f"  |  Stops: {stops_cp}  |  CO₂: {co2_cp:.2f}g  |  Fuel: {fuel_cp:.2f}L"
-        )
+            )
 
 # Close SUMO 
 traci.close()
@@ -288,8 +264,8 @@ print(f"Average CO2 Emissions (Cheven): {sum(co2_cp_history) / len(co2_cp_histor
 print(f"Average Fuel Consumption (Kodrigktonos): {sum(fuel_kp_history) / len(fuel_kp_history):.2f} ml")
 print(f"Average Fuel Consumption (Derigni): {sum(fuel_dp_history) / len(fuel_dp_history):.2f} ml")
 print(f"Average Fuel Consumption (Cheven): {sum(fuel_cp_history) / len(fuel_cp_history):.2f} ml")
-
 print("========================================\n")
+
 
 
 # Plotting
@@ -330,8 +306,8 @@ plt.plot(step_history, stops_kp_history, label="Kodrigktonos")
 plt.plot(step_history, stops_dp_history, label="Derigni")
 plt.plot(step_history, stops_cp_history, label="Cheven")
 plt.xlabel("Simulation Step")
-plt.ylabel("Stops")
-plt.title("Number of Stops per Junction")
+plt.ylabel("Number of Stops")
+plt.title("Stops per Junction")
 plt.legend()
 plt.grid(True)
 
@@ -355,8 +331,8 @@ plt.title("Fuel Consumption per Junction")
 plt.legend()
 plt.grid(True)
 
-plt.suptitle("Multi Agent With Communication Metrics Over Simulation Steps", fontsize=18)
+plt.suptitle("Multi Agent Metrics Over Simulation Steps", fontsize=18)
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-plt.savefig(r"Athens Network\Case Kodrigktonos_Patision Derigni_Patision and Chevden_Patision\Results\Multi Agent Traffic Lights With Communication\Combined_Metrics.png", dpi=300, bbox_inches='tight')
+plt.savefig(r"Athens Network\Case Kodrigktonos_Patision Derigni_Patision and Chevden_Patision\Results\Multi Agent Traffic Lights\Combined_Metrics.png", dpi=300, bbox_inches='tight')
 plt.show()

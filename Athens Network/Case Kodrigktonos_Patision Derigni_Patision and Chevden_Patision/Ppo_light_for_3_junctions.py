@@ -202,7 +202,7 @@ for t in range(TOTAL_STEPS):
 traci.close()
 
 print("\n========== Simulation Summary ==========")
-print(f"Cumulative Reward: {sum(rewards):.2f}")
+print(f"Cumulative Reward: {rewards[-1]:.2f}")
 
 print(f"Average Total Queue Length: {sum(queues) / len(queues):.2f}")
 
