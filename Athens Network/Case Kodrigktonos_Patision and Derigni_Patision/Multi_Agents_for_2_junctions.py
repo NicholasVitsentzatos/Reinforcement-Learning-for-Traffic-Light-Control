@@ -34,7 +34,7 @@ EPSILON = 0.1
 ACTIONS = [0, 1]
 MIN_GREEN_STEPS = 100
 
-# Q-Tables
+# Q-Tables and last switch records
 Q_table_KP = {}
 Q_table_DP = {}
 last_switch_step = {
@@ -50,6 +50,7 @@ detectors = {
                          "Traffic Panel Detector 9", "Traffic Panel Detector 10", "Traffic Panel Detector 11"]
 }
 
+
 # RL-related functions 
 def get_queue_length(detector_id):
     return traci.lanearea.getLastStepVehicleNumber(detector_id)
@@ -57,17 +58,16 @@ def get_queue_length(detector_id):
 def get_current_phase(tls_id):
     return traci.trafficlight.getPhase(tls_id)
 
-def get_joint_state():
-    state_kp = [get_queue_length(det) for det in detectors["Kodrigktonos_Patision"]]
-    state_dp = [get_queue_length(det) for det in detectors["Derigni_Patision"]]
-    phase_kp = get_current_phase("Kodrigktonos_Patision")
-    phase_dp = get_current_phase("Derigni_Patision")
-    return tuple(state_kp + [phase_kp] + state_dp + [phase_dp])
+def get_state(tls_id):
+    detector_ids = detectors[tls_id]
+    queue_lengths = [get_queue_length(det_id) for det_id in detector_ids]
+    current_phase = get_current_phase(tls_id)
+    return tuple(queue_lengths + [current_phase])
 
 def get_reward(state):
     return -float(sum(state[:-1]))
 
-def get_action(agent_id, state, q_table):
+def get_action(state, q_table):
     if state not in q_table:
         q_table[state] = np.zeros(len(ACTIONS))
     if random.random() < EPSILON:
@@ -127,6 +127,7 @@ queue_dp_history = []
 cumulative_reward_kp = 0
 cumulative_reward_dp = 0
 
+# New metric histories
 waiting_kp_history = []
 waiting_dp_history = []
 stops_kp_history = []
@@ -137,40 +138,41 @@ fuel_kp_history = []
 fuel_dp_history = []
 
 
-print("=== Starting Multi-Agent RL with Communication ===")
+print("=== Starting Dual-Agent RL Training ===")
 for step in range(TOTAL_STEPS):
     current_step = step
 
-    joint_state = get_joint_state()
-
-    action_kp = get_action("KP", joint_state, Q_table_KP)
-    action_dp = get_action("DP", joint_state, Q_table_DP)
-
+    # Agent for Kodrigktonos_Patision
+    state_kp = get_state("Kodrigktonos_Patision")
+    action_kp = get_action(state_kp, Q_table_KP)
     apply_action("Kodrigktonos_Patision", action_kp, current_step)
+
+    # Agent for Derigni_Patision
+    state_dp = get_state("Derigni_Patision")
+    action_dp = get_action(state_dp, Q_table_DP)
     apply_action("Derigni_Patision", action_dp, current_step)
 
     traci.simulationStep()
 
-    new_joint_state = get_joint_state()
-
-    reward_kp = get_reward(new_joint_state[:6] + (new_joint_state[6],))
-    reward_dp = get_reward(new_joint_state[7:-1] + (new_joint_state[-1],))
-
+    # Get new states and rewards
+    new_state_kp = get_state("Kodrigktonos_Patision")
+    reward_kp = get_reward(new_state_kp)
+    update_q_table(state_kp, action_kp, reward_kp, new_state_kp, Q_table_KP)
     cumulative_reward_kp += reward_kp
+
+    new_state_dp = get_state("Derigni_Patision")
+    reward_dp = get_reward(new_state_dp)
+    update_q_table(state_dp, action_dp, reward_dp, new_state_dp, Q_table_DP)
     cumulative_reward_dp += reward_dp
 
-    update_q_table(joint_state, action_kp, reward_kp, new_joint_state, Q_table_KP)
-    update_q_table(joint_state, action_dp, reward_dp, new_joint_state, Q_table_DP)
-
     if step % 100 == 0:
-
         step_history.append(step)
         reward_kp_history.append(cumulative_reward_kp)
         reward_dp_history.append(cumulative_reward_dp)
+        queue_kp_history.append(sum(new_state_kp[:-1]))
+        queue_dp_history.append(sum(new_state_dp[:-1]))
 
-        queue_kp_history.append(sum(new_joint_state[:6]))
-        queue_dp_history.append(sum(new_joint_state[7:-1]))
-
+        # Collect per-junction metrics
         wait_kp, stops_kp, co2_kp, fuel_kp = get_vehicle_metrics(detectors["Kodrigktonos_Patision"])
         wait_dp, stops_dp, co2_dp, fuel_dp = get_vehicle_metrics(detectors["Derigni_Patision"])
 
@@ -183,15 +185,13 @@ for step in range(TOTAL_STEPS):
         fuel_kp_history.append(fuel_kp)
         fuel_dp_history.append(fuel_dp)
 
-
         print(
         f"\nStep {step} Metrics:"
-        f"\n  [Kodrigktonos_Patision]  Reward: {reward_kp:.2f}  |  Queue: {sum(new_joint_state[:6])}  |  Waiting: {wait_kp:.2f}s"
+        f"\n  [Kodrigktonos_Patision]  Reward: {reward_kp:.2f}  |  Queue: {sum(new_state_kp[:-1])}  |  Waiting: {wait_kp:.2f}s"
         f"  |  Stops: {stops_kp}  |  CO₂: {co2_kp:.2f}g  |  Fuel: {fuel_kp:.2f}L"
-        f"\n  [Derigni_Patision]       Reward: {reward_dp:.2f}  |  Queue: {sum(new_joint_state[7:-1])}  |  Waiting: {wait_dp:.2f}s"
+        f"\n  [Derigni_Patision]       Reward: {reward_dp:.2f}  |  Queue: {sum(new_state_dp[:-1])}  |  Waiting: {wait_dp:.2f}s"
         f"  |  Stops: {stops_dp}  |  CO₂: {co2_dp:.2f}g  |  Fuel: {fuel_dp:.2f}L"
-        )
-
+    )
 
 # Close SUMO 
 traci.close()
@@ -240,8 +240,8 @@ for i, (kp_data, dp_data, title, ylabel, (color_kp, color_dp)) in enumerate(metr
     plt.legend()
     plt.grid(True)
 
-plt.suptitle("Multi Agent Traffic Lights With Communication Metrics Over Simulation Steps", fontsize=16)
+plt.suptitle("Multi Agent Traffic Lights Metrics Over Simulation Steps", fontsize=16)
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-plt.savefig(r"Athens Network\Case Kodrigktonos_Patision and Derigni_Patision\Results\Multi Agent Traffic Lights With Communication\Combined_Metrics.png", dpi=300, bbox_inches='tight')
+plt.savefig(r"Athens Network\Case Kodrigktonos_Patision and Derigni_Patision\Results\Multi Agent Traffic Lights\Combined_Metrics.png", dpi=300, bbox_inches='tight')
 plt.show()
