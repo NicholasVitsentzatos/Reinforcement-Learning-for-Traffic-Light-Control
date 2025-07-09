@@ -54,68 +54,73 @@ Performance is assessed with a comprehensive set of metrics:
 
 ├── Synthetic Network/ # Experimental testbed
 
-│    ├── Data/ # Synthetic SUMO network files (Must be downloaded from my shared google drive folder)
-│    ├── Results
-│    ├── Typical_light_controller.py
-│    ├── Q_light_controller.py
-│    ├── Deep_Q_light_controller.py
-│    └── Synthetick Network Picture
+    ├── Data/ # Synthetic SUMO network files (Must be downloaded from my shared google drive folder)
+
+    ├── Results
+    
+    ├── Typical_light_controller.py
+    
+    ├── Q_light_controller.py
+    
+    ├── Deep_Q_light_controller.py
+    
+    └── Synthetick Network Picture
     
 ├── Athens Network
 
-│    ├── Case Kondriktonos_Patision
+    ├── Case Kondriktonos_Patision
 
-│       ├── Results
+       ├── Results
 
-│       ├── Typical_light_controller.py
+       ├── Typical_light_controller.py
 
-│        ├── Q_light_controller.py
+        ├── Q_light_controller.py
 
-│        ├── Deep_Q_light_controller.py
+        ├── Deep_Q_light_controller.py
 
-│        ├── PPO_light_controller.py
+        ├── PPO_light_controller.py
 
-│        └── Actuated_light_controller.py
+        └── Actuated_light_controller.py
 
-│    ├── Case Kondriktonos_Derigni_Patision
+    ├── Case Kondriktonos_Derigni_Patision
 
-│        ├── Results
+        ├── Results
 
-│        ├── Typical_light_for_2_junctions.py
+        ├── Typical_light_for_2_junctions.py
 
-│        ├── Q_light_for_2_junctions.py
+        ├── Q_light_for_2_junctions.py
 
-│        ├── PPO_light_for_2_junctions.py
+        ├── PPO_light_for_2_junctions.py
 
-│        ├── Actuated_light_controller.py
+        ├── Actuated_light_controller.py
 
-│        ├── Multi_Agents__for_2_junctions.py
+        ├── Multi_Agents__for_2_junctions.py
 
-│        └── Multi_Agents__with_communication_for_2_junctions.py
+        └── Multi_Agents__with_communication_for_2_junctions.py
 
-│    ├── Case Kondriktonos_Derigni_Cheven_Patision
+    ├── Case Kondriktonos_Derigni_Cheven_Patision
 
-│        ├── Results
+        ├── Results
 
-│        ├── Typical_light_for_3_junctions.py
+        ├── Typical_light_for_3_junctions.py
 
-│        ├── Q_light__for_3_junctions.py
+        ├── Q_light__for_3_junctions.py
 
-│        ├── PPO_light_for_3_junctions.py
+        ├── PPO_light_for_3_junctions.py
 
-│        ├── Actuated_light_controller.py
+        ├── Actuated_light_controller.py
 
-│        ├── Multi_Agents__for_3_junctions.py
+        ├── Multi_Agents__for_3_junctions.py
 
-│        └── Multi_Agents__with_communication_for_3_junctions.py
+        └── Multi_Agents__with_communication_for_3_junctions.py
 
-│    ├── Referenced City Network Picture
+    ├── Referenced City Network Picture
 
-│    └── Simulated City Network Picture
+    └── Simulated City Network Picture
 
-│├── Data/ # Athens SUMO network files (Must be downloaded from my shared google drive folder)
+├── Data/ # Athens SUMO network files (Must be downloaded from my shared google drive folder)
 
-│└── README.md
+└── README.md
 
 ---
 
