@@ -53,11 +53,17 @@ Performance is assessed with a comprehensive set of metrics:
 ## 📁 Repository Structure
 
 ├── Synthetic Network/ # Experimental testbed
+
 │    ├── Data/ # Synthetic SUMO network files (Must be downloaded from my shared google drive folder)
+
 │    ├── Results
+
 │    ├── Typical_light_controller.py
+
 │    ├── Q_light_controller.py
+
 │    ├── Deep_Q_light_controller.py
+
 │    └── Synthetick Network Picture
     
 ├── Athens Network
