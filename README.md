@@ -129,4 +129,4 @@ Performance is assessed with a comprehensive set of metrics:
 1. Install [SUMO](https://sumo.dlr.de/docs/Downloads.html) and set the `SUMO_HOME` environment variable.
 2. Install required Python packages:
    ```bash
-   pip install traci
+   pip install traci torch
